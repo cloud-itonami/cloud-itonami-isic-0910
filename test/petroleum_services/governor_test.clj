@@ -1,0 +1,75 @@
+(ns petroleum-services.governor-test
+  (:require [clojure.test :refer [deftest is testing]]
+            [petroleum-services.store :as store]
+            [petroleum-services.governor :as governor]))
+
+(defn- fresh-store []
+  (let [st (store/mem-store)]
+    (store/register-client! st {:client-id "contractor-1" :name "Acme Petroleum Services" :safety-rating 4.5})
+    (store/register-well-site! st {:site-id "site-001" :operator-id "operator-1" :location "Gulf of Mexico" :risk-level :medium})
+    st))
+
+(deftest ok-on-clean-service-order-intake
+  (let [st (fresh-store)
+        proposal {:op :intake-service-order :effect :propose :confidence 0.9 :stake :low}
+        v (governor/check {:client-id "contractor-1"} {} proposal st)]
+    (is (:ok? v))
+    (is (not (:hard? v)))
+    (is (not (:escalate? v)))))
+
+(deftest hard-on-unregistered-contractor
+  (let [st (fresh-store)
+        proposal {:op :intake-service-order :effect :propose :confidence 0.9 :stake :low}
+        v (governor/check {:client-id "no-such-contractor"} {} proposal st)]
+    (is (:hard? v))
+    (is (some #(= :no-client (:rule %)) (:violations v)))))
+
+(deftest hard-on-no-actuation-violation
+  (let [st (fresh-store)
+        proposal {:op :intake-service-order :effect :direct-write :confidence 0.9 :stake :low}
+        v (governor/check {:client-id "contractor-1"} {} proposal st)]
+    (is (:hard? v))
+    (is (some #(= :no-actuation (:rule %)) (:violations v)))))
+
+(deftest hard-block-drilling-operations
+  (let [st (fresh-store)
+        proposal {:op :drill :effect :propose :confidence 0.9 :stake :high}
+        v (governor/check {:client-id "contractor-1"} {} proposal st)]
+    (is (:hard? v))
+    (is (some #(= :drilling-class-blocked (:rule %)) (:violations v)))))
+
+(deftest hard-block-hazmat-operations
+  (let [st (fresh-store)
+        proposal {:op :hazmat-handle :effect :propose :confidence 0.9 :stake :high}
+        v (governor/check {:client-id "contractor-1"} {} proposal st)]
+    (is (:hard? v))
+    (is (some #(= :drilling-class-blocked (:rule %)) (:violations v)))))
+
+(deftest escalates-on-safety-incident-logging
+  (let [st (fresh-store)
+        proposal {:op :log-safety-incident :effect :propose :confidence 0.9 :stake :high}
+        v (governor/check {:client-id "contractor-1"} {} proposal st)]
+    (is (:escalate? v))
+    (is (not (:hard? v)))))
+
+(deftest escalates-on-high-risk-site-dispatch
+  (let [st (fresh-store)
+        _ (store/register-well-site! st {:site-id "site-002" :operator-id "operator-2" :location "Arctic" :risk-level :high})
+        proposal {:op :schedule-crew-dispatch :effect :propose :confidence 0.9 :stake :medium}
+        v (governor/check {:client-id "contractor-1" :site {:site-id "site-002"}} {} proposal st)]
+    (is (:escalate? v))
+    (is (not (:hard? v)))))
+
+(deftest escalates-on-low-confidence
+  (let [st (fresh-store)
+        proposal {:op :intake-service-order :effect :propose :confidence 0.2 :stake :low}
+        v (governor/check {:client-id "contractor-1"} {} proposal st)]
+    (is (:escalate? v))
+    (is (not (:hard? v)))))
+
+(deftest store-records-and-ledger-append-only
+  (let [st (fresh-store)]
+    (store/commit-record! st {:client-id "contractor-1" :op :intake-service-order})
+    (store/append-ledger! st {:disposition :commit})
+    (is (= 1 (count (store/records-of st "contractor-1"))))
+    (is (= 1 (count (store/ledger st))))))

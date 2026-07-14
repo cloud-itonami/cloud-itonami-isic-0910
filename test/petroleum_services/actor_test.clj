@@ -1,0 +1,52 @@
+(ns petroleum-services.actor-test
+  (:require [clojure.test :refer [deftest is testing]]
+            [petroleum-services.actor :as actor]
+            [petroleum-services.store :as store]))
+
+(defn- fresh-store []
+  (let [st (store/mem-store)]
+    (store/register-client! st {:client-id "contractor-1" :name "Acme Petroleum Services" :safety-rating 4.5})
+    (store/register-well-site! st {:site-id "site-001" :operator-id "operator-1" :location "Gulf of Mexico" :risk-level :medium})
+    st))
+
+(deftest commits-a-clean-low-risk-request
+  (let [st (fresh-store)
+        graph (actor/build-graph {:store st})
+        request {:client-id "contractor-1" :op :intake-service-order :stake :low}
+        result (actor/run-request! graph request {} "thread-1")]
+    (is (= :done (:status result)))
+    (is (some? (get-in result [:state :record])))
+    (is (= 1 (count (store/records-of st "contractor-1"))))))
+
+(deftest holds-on-unregistered-contractor-without-committing
+  (let [st (fresh-store)
+        graph (actor/build-graph {:store st})
+        request {:client-id "no-such-contractor" :op :intake-service-order :stake :low}
+        result (actor/run-request! graph request {} "thread-2")]
+    (is (= :done (:status result)))
+    (is (nil? (get-in result [:state :record])))
+    (is (empty? (store/records-of st "no-such-contractor")))
+    (is (= :hold (:disposition (:state result))))))
+
+(deftest holds-on-drilling-operation-hard-block
+  (let [st (fresh-store)
+        graph (actor/build-graph {:store st})
+        request {:client-id "contractor-1" :op :drill :stake :high}
+        result (actor/run-request! graph request {} "thread-3")]
+    (is (= :done (:status result)))
+    (is (nil? (get-in result [:state :record])))
+    (is (empty? (store/records-of st "contractor-1")))
+    (is (= :hold (:disposition (:state result))))))
+
+(deftest interrupts-then-commits-on-safety-incident-approval
+  (let [st (fresh-store)
+        graph (actor/build-graph {:store st})
+        ;; safety incident logging always escalates (governor invariant)
+        request {:client-id "contractor-1" :op :log-safety-incident :stake :high}
+        interrupted (actor/run-request! graph request {} "thread-4")]
+    (is (= :interrupted (:status interrupted)))
+    (is (empty? (store/records-of st "contractor-1")))
+    (let [resumed (actor/approve! graph "thread-4")]
+      (is (= :done (:status resumed)))
+      (is (some? (get-in resumed [:state :record])))
+      (is (= 1 (count (store/records-of st "contractor-1")))))))

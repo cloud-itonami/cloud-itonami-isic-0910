@@ -1,0 +1,12 @@
+/.clj-kondo
+/.cpcache
+/.nrepl-port
+/.rebel_readline_history
+/target
+.DS_Store
+*.swp
+*~
+.idea
+.vscode
+*.iml
+.calva
