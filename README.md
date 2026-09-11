@@ -73,22 +73,22 @@ human-in-the-loop interrupt/resume via checkpointing.
                                            +-> :hold               (:hard? true)
 ```
 
-- `src/petroleum_services/store.cljc` — `Store` protocol + `MemStore`:
+- `src/petroleum_services/store.cljk` — `Store` protocol + `MemStore`:
   registered contractors, registered well-sites, committed records, an append-only audit ledger.
-- `src/petroleum_services/advisor.cljc` — `Advisor` protocol; `mock-advisor`
+- `src/petroleum_services/advisor.cljk` — `Advisor` protocol; `mock-advisor`
   (deterministic, default) proposes a coordination operation from a
   request; `llm-advisor` wraps a `langchain.model/ChatModel` — either
   way the advisor only ever produces a `:propose`-effect proposal,
   never a committed record, and LLM parse failures always yield
   `confidence 0.0` (forces escalation, never fabricated confidence).
-- `src/petroleum_services/governor.cljc` — `PetroleumServicesGovernor/check`: a pure
+- `src/petroleum_services/governor.cljk` — `PetroleumServicesGovernor/check`: a pure
   function, wired as its own `:govern` node. Hard invariants
   (unregistered contractor, unregistered well-site, a proposal whose `:effect`
   isn't `:propose`, or any operator-class op) always route to `:hold`.
   Escalation invariants (`:log-safety-incident`, high-risk site dispatch, or low advisor
   confidence) always route to `:request-approval` — an `interrupt-before` node that the graph
   checkpoints and only resumes on explicit human approval (`actor/approve!`).
-- `src/petroleum_services/actor.cljc` — `build-graph`, `run-request!`,
+- `src/petroleum_services/actor.cljk` — `build-graph`, `run-request!`,
   `approve!`: the `langgraph.graph/state-graph` wiring itself.
 
 ```bash
