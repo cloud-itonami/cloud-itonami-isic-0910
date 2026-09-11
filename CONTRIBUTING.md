@@ -12,10 +12,10 @@ Thank you for your interest in contributing to cloud-itonami-isic-0910!
 
 ```bash
 # Run tests
-clojure -M:test
+kbb -M:test
 
 # Build
-clojure -X:build
+kbb -X:build
 ```
 
 All source files use `.cljc` (portable Clojure) — no JVM-only constructs without a compelling reason (and documented in the PR).
