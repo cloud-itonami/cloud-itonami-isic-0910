@@ -135,5 +135,5 @@ business record independent of any checkpointing.
 ## References
 
 - ADR-2607011000 (cloud-itonami Actors pattern)
-- CLAUDE.md / Actors section
+- AGENTS.md / Actors section
 - ISIC-08 Classification: https://unstats.un.org/unsd/publication/seriesM/seriesm_4rev4e.pdf
