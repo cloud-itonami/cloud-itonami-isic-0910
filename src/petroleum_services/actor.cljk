@@ -1,7 +1,7 @@
 (ns petroleum-services.actor
   "PetroleumServicesActor — the ISIC-08 0910 petroleum services contractor
   coordination actor as a `langgraph.graph/state-graph` (per ADR-2607011000 /
-  CLAUDE.md Actors section). One graph run = one coordination operation
+  AGENTS.md Actors section). One graph run = one coordination operation
   request (intake → advise → govern → decide → commit/hold, with a
   human-approval interrupt for escalated proposals). No infinite internal
   loop; checkpointed per superstep so an interrupted run can resume after
